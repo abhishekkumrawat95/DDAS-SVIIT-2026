@@ -1,0 +1,103 @@
+# PyInstaller configuration reference
+# ====================================
+# This file documents all hidden imports and data-collection hints used
+# in ddas.spec.  It is NOT read by PyInstaller directly; it exists as a
+# human-readable companion to ddas.spec for documentation purposes.
+#
+# To regenerate ddas.spec from scratch you can run:
+#   pyi-makespec --onedir --windowed launcher.py
+# and then manually add the entries below.
+
+# ── Hidden imports ────────────────────────────────────────────────────────────
+# These modules are imported dynamically (via importlib, __import__, or string
+# references) and are therefore not detected by PyInstaller's static analyser.
+
+[hidden_imports]
+# Tkinter
+tkinter
+tkinter.ttk
+tkinter.messagebox
+tkinter.filedialog
+tkinter.scrolledtext
+
+# DDAS sub-packages (imported via string in main.py / ddas_service.py)
+db
+db.db_helper
+db.init_db
+detection
+detection.hash_engine
+detection.text_similarity
+detection.image_video_detect
+chatbot
+chatbot.chatbot_engine
+
+# scikit-learn Cython extensions
+sklearn.utils._cython_blas
+sklearn.neighbors.typedefs
+sklearn.neighbors.quad_tree
+sklearn.tree._utils
+
+# scipy Cython extension
+scipy.special.cython_special
+
+# PIL Tkinter bridge
+PIL._tkinter_finder
+
+# Windows service (pywin32) – only available on Windows builds
+win32api
+win32con
+win32service
+win32serviceutil
+win32event
+servicemanager
+pywintypes
+
+
+# ── Excluded modules (reduce bundle size) ────────────────────────────────────
+[excludes]
+matplotlib
+PyQt5
+PyQt6
+PySide2
+PySide6
+IPython
+jupyter
+notebook
+nbformat
+nbconvert
+pandas
+sympy
+
+
+# ── Data collection hints ─────────────────────────────────────────────────────
+# PyInstaller's collect_all() hook is applied to these packages in ddas.spec
+# to capture all their data files (e.g. model files, locale data, etc.).
+
+[collect_all]
+watchdog
+sklearn
+scipy
+PIL
+cv2
+pystray
+plyer
+transformers
+tokenizers
+huggingface_hub
+safetensors
+regex
+tqdm
+numpy
+ImageHash
+PyWavelets
+
+
+# ── UPX compression ───────────────────────────────────────────────────────────
+# UPX is applied during the build to reduce executable size.
+# Download UPX from https://upx.github.io/ and add to PATH before building.
+[upx]
+enabled = true
+exclude =
+    vcruntime*.dll
+    msvcp*.dll
+    python*.dll
