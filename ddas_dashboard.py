@@ -52,7 +52,7 @@ class DDASDashboard(tk.Tk):
         self._build_status_bar()
 
         self.after(500, self.refresh_all)
-        self.after(30_000, self._auto_refresh)  # refresh every 30 s
+        self.after(30_000, self._auto_refresh)  # refresh every 30 seconds
 
     # ------------------------------------------------------------------
     # Style helpers
@@ -118,7 +118,8 @@ class DDASDashboard(tk.Tk):
         frame = tk.Frame(nb, bg=BG_DARK)
         nb.add(frame, text=" Overview ")
 
-        self._overview_stats: dict[str, tk.StringVar] = {}
+        from typing import Dict
+        self._overview_stats: Dict[str, tk.StringVar] = {}
         stats = [
             ("total_files",   "📁 Total Files",    FG_GREEN),
             ("total_alerts",  "🔔 Total Alerts",   FG_YELLOW),
