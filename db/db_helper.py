@@ -1,10 +1,15 @@
 
 import sqlite3
 import os
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
-DB_PATH = r"C:\ProgramData\DDAS\ddas.db"
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import config
+
+DB_PATH = config.DB_PATH
 
 def get_connection():
     """Get SQLite connection with WAL mode"""
