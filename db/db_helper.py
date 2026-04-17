@@ -4,7 +4,10 @@ import os
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 
-DB_PATH = r"C:\ProgramData\DDAS\ddas.db"
+# Cross-platform database path (user's home directory)
+_DB_DIR = os.path.join(os.path.expanduser("~"), ".ddas")
+os.makedirs(_DB_DIR, exist_ok=True)
+DB_PATH = os.path.join(_DB_DIR, "ddas.db")
 
 def get_connection():
     """Get SQLite connection with WAL mode"""
