@@ -109,9 +109,18 @@ def run_tray():
         Item("Quit", on_quit),
     )
 
+    if icon_image is None:
+        # PIL unavailable – create a minimal placeholder image via pystray bytes
+        if _PIL_AVAILABLE:
+            icon_image = Image.new("RGB", (64, 64), (0, 120, 215))
+        else:
+            stop_event.set()
+            print("[DDAS Tray] Pillow is required for the system tray icon. Run: pip install pillow")
+            return
+
     icon = pystray.Icon(
         "DDAS",
-        icon_image or Image.new("RGB", (64, 64), (0, 120, 215)),
+        icon_image,
         "DDAS Monitor",
         menu,
     )

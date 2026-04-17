@@ -5,7 +5,7 @@ Uses perceptual hashing (pHash) for images and frame-sampling for videos.
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
@@ -100,7 +100,3 @@ def videos_are_duplicate(fp_a: str, fp_b: str) -> Tuple[bool, float]:
         return avg <= config.IMAGE_HASH_THRESHOLD, 1 - avg / 64
     except Exception:
         return False, 0.0
-
-
-# ── Typing fix ────────────────────────────────────────────────────────────────
-from typing import Tuple  # noqa: E402  (moved here to avoid shadowing above)
