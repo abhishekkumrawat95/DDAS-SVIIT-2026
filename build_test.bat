@@ -1,0 +1,6 @@
+@echo off
+echo Testing...
+if not exist .venv\Scripts\activate.bat (
+    echo [INFO]  Creating virtual environment (.venv) ...
+)
+echo Done.

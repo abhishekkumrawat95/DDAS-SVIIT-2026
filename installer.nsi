@@ -21,8 +21,10 @@ Unicode True
 !define DIST_DIR            "dist\DDAS"           ; relative to where makensis is invoked
 
 ; ── Compression ─────────────────────────────────────────────────────────────
-SetCompressor /SOLID lzma
-SetCompressorDictSize 64
+; Faster build-time compression to avoid very long stalls on large payloads.
+; Trade-off: installer size may be larger than SOLID LZMA.
+SetCompressor /FINAL zlib
+SetCompress auto
 
 ; ── General attributes ───────────────────────────────────────────────────────
 Name "${PRODUCT_FULL_NAME}"

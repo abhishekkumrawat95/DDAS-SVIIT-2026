@@ -69,6 +69,12 @@ def build_nsis_installer() -> None:
     """Invoke makensis to produce DDAS-Setup.exe."""
     makensis = shutil.which("makensis")
     if not makensis:
+        # Common NSIS install location on Windows (e.g., winget default).
+        default_nsis = Path(r"C:\Program Files (x86)\NSIS\makensis.exe")
+        if default_nsis.exists():
+            makensis = str(default_nsis)
+
+    if not makensis:
         print("[WARN] makensis not found in PATH – skipping NSIS build.")
         print("       Install NSIS from https://nsis.sourceforge.io/ and re-run.")
         return
