@@ -4,6 +4,16 @@ launcher.py – DDAS Graphical Launcher
 Provides a friendly Tkinter window that lets the user start/stop
 the monitoring service, open the dashboard, or launch the chatbot.
 It is also the primary entry-point packaged into DDAS-Launcher.exe.
+
+Enhanced features
+-----------------
+* Fix Permissions  – grants all Windows users write access to the DDAS
+                     data directory so User B can open the app without errors.
+* Auto-Start toggle – adds/removes DDAS from the Windows startup registry
+                      (HKLM Run) so the monitor launches on every boot.
+* Real-time popup alerts – a background thread polls the database every few
+                           seconds and shows a desktop notification whenever a
+                           new duplicate alert arrives for the current user.
 """
 
 from __future__ import annotations
@@ -12,6 +22,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 from pathlib import Path
@@ -33,6 +44,129 @@ ACCENT = "#89b4fa"
 GREEN  = "#a6e3a1"
 RED    = "#f38ba8"
 YELLOW = "#f9e2af"
+ORANGE = "#fab387"
+
+# How often (ms) to poll for new alerts for the current user
+_ALERT_POLL_MS = 4000
+
+
+# ── Permission helper ─────────────────────────────────────────────────────────
+
+def _fix_data_dir_permissions(data_dir: str) -> bool:
+    """
+    Use icacls to grant the built-in *Users* group full control over *data_dir*
+    (recursive).  Returns True on success, False otherwise.
+    Only meaningful on Windows; silently succeeds on other platforms.
+    """
+    if sys.platform != "win32":
+        return True
+    try:
+        result = subprocess.run(
+            ["icacls", data_dir, "/grant", "Users:(OI)(CI)F", "/T", "/C", "/Q"],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+# ── Auto-start helpers ────────────────────────────────────────────────────────
+
+def _autostart_exe_path() -> str:
+    """Return the path to the launcher executable (or script)."""
+    if getattr(sys, "frozen", False):
+        return sys.executable          # PyInstaller EXE
+    return str(Path(__file__).resolve())
+
+
+def _is_autostart_enabled() -> bool:
+    """Return True if the DDAS auto-start registry entry exists."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        from config import AUTOSTART_REG_KEY, AUTOSTART_REG_NAME
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, AUTOSTART_REG_KEY)
+        winreg.QueryValueEx(key, AUTOSTART_REG_NAME)
+        winreg.CloseKey(key)
+        return True
+    except Exception:
+        return False
+
+
+def _set_autostart(enabled: bool) -> bool:
+    """
+    Add or remove the DDAS auto-start registry entry under
+    HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run.
+    Returns True on success.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        from config import AUTOSTART_REG_KEY, AUTOSTART_REG_NAME
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, AUTOSTART_REG_KEY,
+            0, winreg.KEY_SET_VALUE,
+        )
+        if enabled:
+            exe = _autostart_exe_path()
+            value = f'"{exe}" monitor'
+            winreg.SetValueEx(key, AUTOSTART_REG_NAME, 0, winreg.REG_SZ, value)
+        else:
+            try:
+                winreg.DeleteValue(key, AUTOSTART_REG_NAME)
+            except FileNotFoundError:
+                pass
+        winreg.CloseKey(key)
+        return True
+    except Exception:
+        return False
+
+
+# ── Alert-polling helpers ─────────────────────────────────────────────────────
+
+def _current_username() -> str:
+    """Return the OS username of whoever is running this process."""
+    return (
+        os.environ.get("USERNAME")
+        or os.environ.get("USER")
+        or "unknown"
+    )
+
+
+def _show_alert_popup(alert_row: tuple) -> None:
+    """
+    Show a desktop popup notification for a duplicate-file alert.
+    *alert_row* is a row from the alerts table:
+        (id, alert_for, duplicate_type, similarity, new_file_name, new_file_path,
+         original_file, original_path, original_user, original_time, status, created_time)
+    """
+    try:
+        (
+            _id, alert_for, dup_type, similarity,
+            new_file, _new_path, orig_file, _orig_path,
+            orig_user, _orig_time, _status, _ctime,
+        ) = alert_row
+        pct = int(float(similarity) * 100)
+        msg = (
+            f"⚠ Duplicate detected for {alert_for}!\n"
+            f"  New file : {new_file}\n"
+            f"  Original : {orig_file}  (by {orig_user})\n"
+            f"  Match    : {pct}%  [{dup_type}]"
+        )
+        try:
+            from plyer import notification
+            notification.notify(
+                title="DDAS – Duplicate Alert",
+                message=msg,
+                timeout=10,
+            )
+        except Exception:
+            pass   # plyer unavailable or headless
+    except Exception:
+        pass
 
 
 class LauncherApp(tk.Tk):
@@ -44,7 +178,36 @@ class LauncherApp(tk.Tk):
         self.resizable(False, False)
         self.configure(bg=BG)
         self._monitor_proc: subprocess.Popen | None = None
+        self._autostart_var = tk.BooleanVar(value=_is_autostart_enabled())
         self._build_ui()
+        # Fix permissions on startup so User B can access shared files
+        self._fix_permissions_silent()
+        # Start background alert-polling loop
+        self._last_seen_alert_id: int = self._get_max_alert_id()
+        self._schedule_alert_poll()
+
+    # ── Startup helpers ───────────────────────────────────────────────────────
+
+    def _fix_permissions_silent(self) -> None:
+        """Silently attempt to fix DDAS data-dir permissions on startup."""
+        if sys.platform != "win32":
+            return
+        try:
+            from config import DATA_DIR
+            _fix_data_dir_permissions(str(DATA_DIR))
+        except Exception:
+            pass
+
+    def _get_max_alert_id(self) -> int:
+        """Return the highest alert ID currently in the DB (0 if none)."""
+        try:
+            from db.db_helper import get_connection
+            conn = get_connection()
+            row = conn.execute("SELECT MAX(id) FROM alerts").fetchone()
+            conn.close()
+            return row[0] or 0
+        except Exception:
+            return 0
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -73,7 +236,31 @@ class LauncherApp(tk.Tk):
         self._make_btn(btn_frame, "📊  Open Dashboard", self._open_dashboard, ACCENT)
         self._make_btn(btn_frame, "🤖  Open Chatbot", self._open_chatbot, YELLOW)
 
-        tk.Frame(self, bg=PANEL, height=2).pack(fill=tk.X, padx=20, pady=12)
+        tk.Frame(self, bg=PANEL, height=2).pack(fill=tk.X, padx=20, pady=8)
+
+        # Utility buttons
+        util_frame = tk.Frame(self, bg=BG)
+        util_frame.pack(padx=24, pady=2)
+        self._make_btn(
+            util_frame, "🔧  Fix Permissions (All Users)",
+            self._on_fix_permissions, ORANGE,
+        )
+
+        # Auto-start checkbox
+        chk_frame = tk.Frame(self, bg=BG)
+        chk_frame.pack(pady=(4, 0))
+        tk.Checkbutton(
+            chk_frame,
+            text="Auto-start monitor on Windows boot",
+            variable=self._autostart_var,
+            command=self._on_autostart_toggle,
+            bg=BG, fg=FG,
+            activebackground=BG, activeforeground=FG,
+            selectcolor=PANEL,
+            font=("Segoe UI", 9),
+        ).pack()
+
+        tk.Frame(self, bg=PANEL, height=2).pack(fill=tk.X, padx=20, pady=8)
 
         # Status indicator
         status_row = tk.Frame(self, bg=BG)
@@ -112,7 +299,7 @@ class LauncherApp(tk.Tk):
             activebackground=BG, activeforeground=fg,
             relief=tk.FLAT, padx=12, pady=6,
             font=("Segoe UI", 9),
-            width=22,
+            width=30,
         )
         btn.pack(pady=3, fill=tk.X)
         return btn
@@ -210,6 +397,102 @@ class LauncherApp(tk.Tk):
             self._log_msg("[INFO] Chatbot launched.")
         except FileNotFoundError as exc:
             messagebox.showerror("Error", f"Cannot open chatbot:\n{exc}")
+
+    # ── Permission fix ────────────────────────────────────────────────────────
+
+    def _on_fix_permissions(self) -> None:
+        """Fix DDAS data-dir permissions so all users can access the shared DB."""
+        try:
+            from config import DATA_DIR
+            data_dir = str(DATA_DIR)
+        except Exception:
+            data_dir = os.path.join(
+                os.environ.get("PROGRAMDATA", "C:\\ProgramData"), "DDAS"
+            )
+
+        self._log_msg("[INFO] Fixing permissions on: " + data_dir)
+        ok = _fix_data_dir_permissions(data_dir)
+        if ok:
+            self._log_msg("[INFO] Permissions fixed – all users can now access DDAS.")
+            messagebox.showinfo(
+                "Permissions Fixed",
+                f"All users now have full access to:\n{data_dir}\n\n"
+                "User B can start DDAS without 'Permission denied' errors.",
+            )
+        else:
+            self._log_msg("[WARN] Could not fix permissions (run as Administrator?).")
+            messagebox.showwarning(
+                "Permission Fix Failed",
+                "Could not update folder permissions.\n\n"
+                "Please run DDAS Launcher as Administrator and try again,\n"
+                "or run this command manually:\n\n"
+                f'icacls "{data_dir}" /grant Users:(OI)(CI)F /T /C',
+            )
+
+    # ── Auto-start toggle ─────────────────────────────────────────────────────
+
+    def _on_autostart_toggle(self) -> None:
+        enabled = self._autostart_var.get()
+        ok = _set_autostart(enabled)
+        if ok:
+            state = "enabled" if enabled else "disabled"
+            self._log_msg(f"[INFO] Auto-start on Windows boot {state}.")
+        else:
+            # Revert checkbox – operation failed (likely needs admin rights)
+            self._autostart_var.set(not enabled)
+            self._log_msg("[WARN] Could not update startup registry (run as Administrator?).")
+            messagebox.showwarning(
+                "Auto-Start Failed",
+                "Could not modify the Windows startup registry.\n"
+                "Please run DDAS Launcher as Administrator to enable auto-start.",
+            )
+
+    # ── Real-time alert polling ───────────────────────────────────────────────
+
+    def _schedule_alert_poll(self) -> None:
+        """Schedule the next poll iteration via Tk's after()."""
+        self.after(_ALERT_POLL_MS, self._poll_alerts)
+
+    def _poll_alerts(self) -> None:
+        """
+        Check the database for new alerts directed at the current user that
+        have arrived since the last poll.  Show a popup for each one found,
+        then mark them as 'shown'.
+        """
+        try:
+            from db.db_helper import get_connection, update_alert_status
+            username = _current_username()
+            conn = get_connection()
+            rows = conn.execute(
+                """
+                SELECT * FROM alerts
+                WHERE  alert_for = ?
+                  AND  status    = 'pending'
+                  AND  id        > ?
+                ORDER  BY id ASC
+                """,
+                (username, self._last_seen_alert_id),
+            ).fetchall()
+            conn.close()
+
+            for row in rows:
+                alert_id = row[0]
+                _show_alert_popup(row)
+                # Log to launcher window
+                new_file = row[4] if len(row) > 4 else "?"
+                orig_file = row[6] if len(row) > 6 else "?"
+                self.after(
+                    0, self._log_msg,
+                    f"[ALERT] Duplicate: '{new_file}' matches '{orig_file}'",
+                )
+                update_alert_status(alert_id, "shown")
+                if alert_id > self._last_seen_alert_id:
+                    self._last_seen_alert_id = alert_id
+
+        except Exception:
+            pass   # DB not yet initialised or unavailable — silently skip
+
+        self._schedule_alert_poll()
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

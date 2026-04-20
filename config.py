@@ -49,5 +49,14 @@ SLACK_WEBHOOK = os.environ.get("SLACK_WEBHOOK", "")
 LOG_FILE = str(DATA_DIR / "ddas.log")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
+# ── Auto-start ───────────────────────────────────────────────────────────────
+# When True, launcher.py registers DDAS in the Windows startup registry so the
+# monitor begins automatically after every reboot (Windows only).
+AUTOSTART_ENABLED = os.environ.get("DDAS_AUTOSTART", "0") == "1"
+
+# Registry key path used for auto-start (HKLM Run key – system-wide)
+AUTOSTART_REG_KEY  = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+AUTOSTART_REG_NAME = "DDASMonitor"
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 DASHBOARD_REFRESH_MS = int(os.environ.get("DASHBOARD_REFRESH_MS", "5000"))

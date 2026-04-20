@@ -53,6 +53,31 @@ def _get_log_path() -> Path:
     return data_root / "service.log"
 
 
+def _ensure_data_dir_permissions() -> None:
+    """
+    Grant the built-in *Users* group full control over the DDAS data directory
+    so that every Windows user account can read/write the shared database and
+    log files without a 'Permission denied' error.
+
+    This is a no-op on non-Windows platforms or when icacls is unavailable.
+    """
+    if os.name != "nt":
+        return
+    data_dir = Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) / "DDAS"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        import subprocess as _sp
+        _sp.run(
+            ["icacls", str(data_dir), "/grant", "Users:(OI)(CI)F", "/T", "/C", "/Q"],
+            check=False,
+            stdout=_sp.DEVNULL,
+            stderr=_sp.DEVNULL,
+        )
+        log.info("Data directory permissions updated: %s", data_dir)
+    except Exception as exc:
+        log.warning("Could not set data directory permissions: %s", exc)
+
+
 logging.basicConfig(
     filename=str(_get_log_path()),
     level=logging.INFO,
@@ -97,6 +122,7 @@ if _HAS_WIN32:
         def _run(self):
             try:
                 from db.init_db import init_db
+                _ensure_data_dir_permissions()
                 init_db()
                 log.info("Database initialised.")
 
