@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -172,8 +173,22 @@ class _DownloadHandler(FileSystemEventHandler if _HAS_WATCHDOG else object):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+_observer: "Observer | None" = None
+_observer_lock = threading.Lock()
+
+
+def stop() -> None:
+    """Signal the monitoring loop to stop (safe to call from any thread)."""
+    with _observer_lock:
+        if _observer is not None:
+            _observer.stop()
+            log.info("DDAS monitor stop requested.")
+
+
 def start(watch_folder: str = WATCH_FOLDER) -> None:
-    """Start the monitoring loop (blocks until KeyboardInterrupt)."""
+    """Start the monitoring loop (blocks until KeyboardInterrupt or stop())."""
+    global _observer
+
     if not _HAS_WATCHDOG:
         log.error("watchdog library not installed. Run: pip install watchdog")
         sys.exit(1)
@@ -183,20 +198,24 @@ def start(watch_folder: str = WATCH_FOLDER) -> None:
     folder = Path(watch_folder)
     folder.mkdir(parents=True, exist_ok=True)
 
-    observer = Observer()
-    observer.schedule(_DownloadHandler(), str(folder), recursive=False)
-    observer.start()
+    obs = Observer()
+    obs.schedule(_DownloadHandler(), str(folder), recursive=False)
+    obs.start()
+    with _observer_lock:
+        _observer = obs
     log.info("DDAS monitoring started. Watching: %s", folder)
     print(f"[DDAS] Monitoring '{folder}' — press Ctrl+C to stop.")
 
     try:
-        while observer.is_alive():
+        while obs.is_alive():
             time.sleep(1)
     except KeyboardInterrupt:
         log.info("Shutdown requested.")
     finally:
-        observer.stop()
-        observer.join()
+        obs.stop()
+        obs.join()
+        with _observer_lock:
+            _observer = None
         log.info("DDAS monitor stopped.")
 
 

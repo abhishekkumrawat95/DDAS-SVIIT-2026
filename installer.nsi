@@ -134,9 +134,17 @@ SectionEnd
 ; ═══════════════════════════════════════════════════════════════════════════
 Section "Uninstall"
 
-  ; Stop and remove Windows service if it is installed
-  ExecWait '"$INSTDIR\DDAS-Monitor.exe" stop'
-  ExecWait '"$INSTDIR\DDAS-Monitor.exe" remove'
+  ; Stop Windows service (if installed) – sc.exe returns immediately even when
+  ; the service is not registered, so the uninstaller never hangs here.
+  ExecWait 'sc stop DDASMonitor'
+  Sleep 3000   ; Allow up to 3 s for the service to reach the Stopped state
+
+  ; Force-terminate any running DDAS-Monitor process (covers the auto-start
+  ; Run-key launch path where the monitor is NOT a Windows service).
+  ExecWait 'taskkill /F /IM DDAS-Monitor.exe /T'
+
+  ; Remove the Windows service registration (no-op if not installed).
+  ExecWait 'sc delete DDASMonitor'
 
   ; Remove auto-start registry entry
   DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "DDASMonitor"
