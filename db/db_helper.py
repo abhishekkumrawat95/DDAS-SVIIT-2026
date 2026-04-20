@@ -110,6 +110,146 @@ def search_files_by_keyword(keyword: str) -> List[Tuple]:
         conn.close()
 
 
+def search_files_by_type(file_type: str) -> List[Tuple]:
+    """Return all downloads whose file_type matches *file_type* (case-insensitive)."""
+    conn = get_connection()
+    try:
+        return conn.execute(
+            """
+            SELECT file_name, file_type, downloaded_by, download_time, file_path
+            FROM   downloads
+            WHERE  file_type LIKE ?
+            ORDER  BY download_time DESC
+            """,
+            (f"%{file_type}%",),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def search_files_by_user(username: str) -> List[Tuple]:
+    """Return all downloads attributed to *username* (partial match, case-insensitive)."""
+    conn = get_connection()
+    try:
+        return conn.execute(
+            """
+            SELECT file_name, file_type, downloaded_by, download_time, file_path
+            FROM   downloads
+            WHERE  downloaded_by LIKE ?
+            ORDER  BY download_time DESC
+            """,
+            (f"%{username}%",),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def search_files_by_date_range(start_date: str, end_date: str) -> List[Tuple]:
+    """
+    Return downloads whose download_time falls in [start_date, end_date).
+    Dates should be ISO-format strings, e.g. '2026-04-01' or '2026-04-01T00:00:00'.
+    """
+    conn = get_connection()
+    try:
+        return conn.execute(
+            """
+            SELECT file_name, file_type, downloaded_by, download_time, file_path
+            FROM   downloads
+            WHERE  download_time >= ? AND download_time < ?
+            ORDER  BY download_time DESC
+            """,
+            (start_date, end_date),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def search_files_by_size(min_bytes: int = 0, max_bytes: int = -1) -> List[Tuple]:
+    """
+    Return downloads filtered by file size.
+    Pass *max_bytes* = -1 (default) to apply no upper bound.
+    """
+    conn = get_connection()
+    try:
+        if max_bytes < 0:
+            return conn.execute(
+                """
+                SELECT file_name, file_type, file_size, downloaded_by, download_time, file_path
+                FROM   downloads
+                WHERE  file_size >= ?
+                ORDER  BY file_size DESC
+                """,
+                (min_bytes,),
+            ).fetchall()
+        return conn.execute(
+            """
+            SELECT file_name, file_type, file_size, downloaded_by, download_time, file_path
+            FROM   downloads
+            WHERE  file_size >= ? AND file_size <= ?
+            ORDER  BY file_size DESC
+            """,
+            (min_bytes, max_bytes),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def get_cross_user_duplicates(user1: str = "", user2: str = "") -> List[Tuple]:
+    """
+    Return pairs of rows that share the same hash but were downloaded by different users.
+    Optionally restrict to rows involving *user1* and/or *user2*.
+    Each returned tuple is:
+        (file_name_a, user_a, time_a, file_name_b, user_b, time_b)
+    """
+    conn = get_connection()
+    try:
+        if user1 and user2:
+            return conn.execute(
+                """
+                SELECT a.file_name, a.downloaded_by, a.download_time,
+                       b.file_name, b.downloaded_by, b.download_time
+                FROM   downloads a
+                JOIN   downloads b
+                       ON  a.file_hash = b.file_hash
+                       AND a.id < b.id
+                       AND a.downloaded_by != b.downloaded_by
+                WHERE  (a.downloaded_by LIKE ? AND b.downloaded_by LIKE ?)
+                    OR (a.downloaded_by LIKE ? AND b.downloaded_by LIKE ?)
+                ORDER  BY a.download_time DESC
+                """,
+                (f"%{user1}%", f"%{user2}%", f"%{user2}%", f"%{user1}%"),
+            ).fetchall()
+        if user1:
+            return conn.execute(
+                """
+                SELECT a.file_name, a.downloaded_by, a.download_time,
+                       b.file_name, b.downloaded_by, b.download_time
+                FROM   downloads a
+                JOIN   downloads b
+                       ON  a.file_hash = b.file_hash
+                       AND a.id < b.id
+                       AND a.downloaded_by != b.downloaded_by
+                WHERE  a.downloaded_by LIKE ? OR b.downloaded_by LIKE ?
+                ORDER  BY a.download_time DESC
+                """,
+                (f"%{user1}%", f"%{user1}%"),
+            ).fetchall()
+        return conn.execute(
+            """
+            SELECT a.file_name, a.downloaded_by, a.download_time,
+                   b.file_name, b.downloaded_by, b.download_time
+            FROM   downloads a
+            JOIN   downloads b
+                   ON  a.file_hash = b.file_hash
+                   AND a.id < b.id
+                   AND a.downloaded_by != b.downloaded_by
+            ORDER  BY a.download_time DESC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+
 def get_all_docs_for_similarity() -> List[Tuple]:
     """Return (id, extracted_text) rows for TF-IDF similarity checks."""
     conn = get_connection()

@@ -76,37 +76,47 @@ Section "Install ${PRODUCT_NAME}" SecMain
   WriteRegDWORD ${REG_ROOT} "${REG_UNINSTALL_KEY}" "NoModify"             1
   WriteRegDWORD ${REG_ROOT} "${REG_UNINSTALL_KEY}" "NoRepair"             1
 
-  ; ── Start Menu shortcuts ─────────────────────────────────────────────────
-  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+  ; ── Start Menu shortcuts (all users) ────────────────────────────────────
+  ; Use $COMMONPROGRAMDATA so shortcuts appear for every user account.
+  CreateDirectory "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}"
 
-  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\DDAS Launcher.lnk" \
+  CreateShortCut  "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}\DDAS Launcher.lnk" \
                   "$INSTDIR\${MAIN_EXE}" "" \
                   "$INSTDIR\${MAIN_EXE}" 0 \
                   SW_SHOWNORMAL "" \
                   "Launch DDAS application"
 
-  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\DDAS Dashboard.lnk" \
+  CreateShortCut  "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}\DDAS Dashboard.lnk" \
                   "$INSTDIR\DDAS-Dashboard.exe" "" \
                   "$INSTDIR\DDAS-Dashboard.exe" 0 \
                   SW_SHOWNORMAL "" \
                   "Open DDAS Dashboard"
 
-  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\DDAS Chatbot.lnk" \
+  CreateShortCut  "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}\DDAS Chatbot.lnk" \
                   "$INSTDIR\DDAS-Chatbot.exe" "" \
                   "$INSTDIR\DDAS-Chatbot.exe" 0 \
                   SW_SHOWNORMAL "" \
                   "Open DDAS Chatbot"
 
-  CreateShortCut  "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall DDAS.lnk" \
+  CreateShortCut  "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}\Uninstall DDAS.lnk" \
                   "$INSTDIR\${UNINSTALLER_NAME}" "" \
                   "$INSTDIR\${UNINSTALLER_NAME}" 0
 
-  ; Desktop shortcut
+  ; Desktop shortcut (current user only – each user can create their own)
   CreateShortCut  "$DESKTOP\DDAS Launcher.lnk" \
                   "$INSTDIR\${MAIN_EXE}" "" \
                   "$INSTDIR\${MAIN_EXE}" 0 \
                   SW_SHOWNORMAL "" \
                   "Launch DDAS"
+
+  ; ── Grant all users write access to the DDAS data directory ─────────────
+  ; This prevents 'Permission denied' errors when a non-admin user starts DDAS.
+  CreateDirectory "$COMMONAPPDATA\DDAS"
+  ExecWait 'icacls "$COMMONAPPDATA\DDAS" /grant Users:(OI)(CI)F /T /C /Q'
+
+  ; ── Auto-start registry entry (system-wide, runs monitor on every boot) ──
+  WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" \
+              "DDASMonitor" '"$INSTDIR\DDAS-Monitor.exe" monitor'
 
 SectionEnd
 
@@ -128,8 +138,11 @@ Section "Uninstall"
   ExecWait '"$INSTDIR\DDAS-Monitor.exe" stop'
   ExecWait '"$INSTDIR\DDAS-Monitor.exe" remove'
 
-  ; Remove Start Menu shortcuts
-  RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
+  ; Remove auto-start registry entry
+  DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "DDASMonitor"
+
+  ; Remove Start Menu shortcuts (all-users path)
+  RMDir /r "$COMMONPROGRAMDATA\Microsoft\Windows\Start Menu\Programs\${PRODUCT_NAME}"
 
   ; Remove Desktop shortcut
   Delete "$DESKTOP\DDAS Launcher.lnk"
