@@ -55,8 +55,8 @@ _INTENTS: List[Tuple[str, str]] = [
     (r"\bthis\s+month\b",                                  "by_date_month"),
     (r"\blast\s+month\b",                                  "by_date_last_month"),
     # Size queries: "> 1mb", "larger than 500kb", "size > 1mb"
-    (r"\b(larger|bigger|greater|more|>|above)\b.*\b(\d+)\s*(kb|mb|gb|b)\b", "by_size_gt"),
-    (r"\b(\d+)\s*(kb|mb|gb|b)\b.*\b(larger|bigger|greater|more|>|above)\b", "by_size_gt"),
+    (r"\b(larger|bigger|greater|more|>|above)\b.*\b(\d+)\s*(kb|mb|gb|b)\b"
+     r"|\b(\d+)\s*(kb|mb|gb|b)\b.*\b(larger|bigger|greater|more|>|above)\b", "by_size_gt"),
     (r"\bsize\s*[>]\s*(\d+)\s*(kb|mb|gb|b)?\b",                              "by_size_gt"),
     # File-type queries: "show all pdfs", "find txt files", "show me all txt files"
     # (before list_all so type-specific queries win over generic ones)
@@ -343,7 +343,6 @@ def respond(user_input: str) -> str:
         min_bytes = _parse_size_bytes(text)
         if min_bytes is not None:
             rows = search_files_by_size(min_bytes=min_bytes)
-            size_label = text  # keep original phrasing for feedback
             return (
                 f"📦 Files larger than {min_bytes:,} bytes:\n" + _fmt_files(rows)
             )

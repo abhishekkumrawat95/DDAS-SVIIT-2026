@@ -47,7 +47,7 @@ YELLOW = "#f9e2af"
 ORANGE = "#fab387"
 
 # How often (ms) to poll for new alerts for the current user
-_ALERT_POLL_MS = 4000
+_ALERT_POLL_MS = 10_000
 
 
 # ── Permission helper ─────────────────────────────────────────────────────────
@@ -74,10 +74,15 @@ def _fix_data_dir_permissions(data_dir: str) -> bool:
 # ── Auto-start helpers ────────────────────────────────────────────────────────
 
 def _autostart_exe_path() -> str:
-    """Return the path to the launcher executable (or script)."""
+    """Return the path to the monitor executable (or script) used for auto-start."""
     if getattr(sys, "frozen", False):
-        return sys.executable          # PyInstaller EXE
-    return str(Path(__file__).resolve())
+        # Running as a PyInstaller bundle: all EXEs live next to each other
+        monitor_exe = Path(sys.executable).parent / "DDAS-Monitor.exe"
+        if monitor_exe.exists():
+            return str(monitor_exe)
+        return str(Path(sys.executable).parent / "DDAS-Monitor")
+    # Development fallback: point at main.py with 'monitor' argument
+    return str(Path(__file__).resolve().parent / "main.py")
 
 
 def _is_autostart_enabled() -> bool:
@@ -112,7 +117,11 @@ def _set_autostart(enabled: bool) -> bool:
         )
         if enabled:
             exe = _autostart_exe_path()
-            value = f'"{exe}" monitor'
+            # Use python interpreter for .py scripts, direct EXE otherwise
+            if exe.endswith(".py"):
+                value = f'"{sys.executable}" "{exe}" monitor'
+            else:
+                value = f'"{exe}" monitor'
             winreg.SetValueEx(key, AUTOSTART_REG_NAME, 0, winreg.REG_SZ, value)
         else:
             try:
