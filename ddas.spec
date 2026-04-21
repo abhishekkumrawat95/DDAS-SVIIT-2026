@@ -29,8 +29,11 @@ _COLLECT_PKGS = (
     "PyWavelets",
 )
 
-print(f"\n[spec] Collecting data/hooks for {len(_COLLECT_PKGS)} packages "
-      f"(this can take 5-20 min on first run) …", flush=True)
+print(f"\n[spec] Collecting data/hooks for {len(_COLLECT_PKGS)} packages …", flush=True)
+print("[spec] NOTE: Each large package (transformers, sklearn, scipy …) can take",
+      flush=True)
+print("[spec]       several minutes.  The build is NOT frozen – please be patient.",
+      flush=True)
 
 for _pkg in _COLLECT_PKGS:
     print(f"[spec]   • {_pkg} …", end=" ", flush=True)

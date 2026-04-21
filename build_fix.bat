@@ -61,7 +61,7 @@ echo [OK]    Dependencies installed.
 
 rem -- Run Python build script -------------------------------------------
 echo [INFO]  Starting build ...
-python build_installer.py
+python build_installer.py %*
 if errorlevel 1 (
     echo [ERROR] Build failed. Check the output above for details.
     pause
