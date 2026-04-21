@@ -1,0 +1,70 @@
+@startuml DDAS_Class_Diagram
+title DDAS - Class Diagram (Week 3: Domain Model)
+
+class User {
+  -userId: String
+  -name: String
+  -email: String
+  -role: String
+  +createMonitoredFolder(): void
+  +viewAlerts(): Alert[]
+  +generateReport(): Report
+}
+
+class MonitoredFolder {
+  -folderId: String
+  -path: String
+  -scanInterval: int
+  -status: String
+  +startMonitoring(): void
+  +stopMonitoring(): void
+  +getScanStatus(): String
+}
+
+class File {
+  -fileId: String
+  -name: String
+  -hash: String
+  -size: long
+  -uploadTime: DateTime
+  +calculateHash(): String
+  +getMetadata(): Object
+}
+
+class Duplicate {
+  -duplicateId: String
+  -originalHash: String
+  -fileCount: int
+  -detectedTime: DateTime
+  +identifyDuplicate(): void
+  +getDuplicateFiles(): File[]
+}
+
+class Alert {
+  -alertId: String
+  -type: String
+  -severity: String
+  -message: String
+  -status: String
+  +createAlert(): void
+  +updateStatus(): void
+}
+
+class Report {
+  -reportId: String
+  -name: String
+  -generatedDate: DateTime
+  -totalDuplicates: int
+  -format: String
+  +generateReport(): void
+  +exportReport(): File
+}
+
+User "1" --> "*" MonitoredFolder : manages
+MonitoredFolder "1" --> "*" File : contains
+File "*" --> "1" Duplicate : identified_as
+Duplicate "1" --> "*" Alert : triggers
+Alert "1" --> "1" User : notifies
+Report "1" --> "*" Duplicate : analyzes
+
+@enduml
