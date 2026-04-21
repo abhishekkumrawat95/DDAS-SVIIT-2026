@@ -1,0 +1,60 @@
+# Software Requirements Specification (SRS) for DDAS Project
+
+## 1. Introduction  
+### 1.1 Purpose  
+This document describes the software requirements for the DDAS Project, aiming to provide a comprehensive overview of the project's functionalities and non-functional requirements.
+
+### 1.2 Scope  
+This SRS outlines the functionality of the Digital Document Archiving System (DDAS). The system will allow users to archive, retrieve, and manage digital documents efficiently.
+
+### 1.3 Definitions, Acronyms, and Abbreviations  
+- DDAS: Digital Document Archiving System  
+
+### 1.4 References  
+[List any applicable references]
+
+### 1.5 Overview  
+This document is structured to guide developers and stakeholders through the functional and non-functional requirements of the DDAS.
+
+## 2. Functional Requirements  
+- User Authentication  
+- Document Upload  
+- Document Retrieval  
+- Document Deletion  
+- Search Functionality  
+- User Role Management  
+
+## 3. Non-Functional Requirements  
+- Performance: The system should handle 1000 concurrent users.  
+- Security: All data must be encrypted during transit.  
+- Usability: The system should have an intuitive user interface.
+
+## 4. System Architecture  
+A high-level overview diagram will be provided, showing the components of the system and their interactions.
+
+## 5. Database Schema  
+- **Users Table**:  
+  - user_id (PK)  
+  - username  
+  - password_hash  
+
+- **Documents Table**:  
+  - document_id (PK)  
+  - user_id (FK)  
+  - document_path  
+
+## 6. Use Cases  
+- Use Case 1: User Login  
+- Use Case 2: Upload Document  
+- Use Case 3: Retrieve Document  
+
+## 7. Acceptance Criteria  
+- All functional requirements must be implemented and tested.  
+- Performance benchmarks must be met.
+
+## 8. Deployment Strategy  
+- The deployment will follow a CI/CD approach, utilizing cloud services to ensure high availability and scalability.
+
+---  
+*Date Created: 2026-04-21 03:16:53*  
+*Created by: abhishekkumrawat95*  
