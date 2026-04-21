@@ -1,0 +1,7 @@
+@startuml
+
+object ObjectName {
+    + attribute1: Type
+    + attribute2: Type
+}
+@enduml
