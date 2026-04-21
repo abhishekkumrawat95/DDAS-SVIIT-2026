@@ -36,7 +36,17 @@ VERSION = "1.0.0"
 def _run(cmd: list[str], cwd: Path | None = None) -> None:
     """Run a subprocess command, raising on failure."""
     print(f"\n>>> {' '.join(str(c) for c in cmd)}\n", flush=True)
-    result = subprocess.run(cmd, cwd=cwd or REPO_DIR)
+    # Ensure the child process produces unbuffered, real-time output and that
+    # HuggingFace / Transformers libraries do NOT make network calls while
+    # PyInstaller analyses imports (those blocking HTTP requests are the most
+    # common reason the build appears frozen on Windows).
+    env = os.environ.copy()
+    env.update({
+        "PYTHONUNBUFFERED": "1",       # real-time stdout/stderr
+        "HF_HUB_OFFLINE": "1",         # no HuggingFace Hub network calls
+        "TRANSFORMERS_OFFLINE": "1",   # no Transformers download attempts
+    })
+    result = subprocess.run(cmd, cwd=cwd or REPO_DIR, env=env)
     if result.returncode != 0:
         sys.exit(f"[ERROR] Command failed with exit code {result.returncode}")
 
