@@ -16,21 +16,34 @@ import sys
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 # ── Collect third-party packages that have data files ────────────────────────
+# NOTE: collect_all() on large packages (transformers, sklearn, scipy) can take
+#       several minutes — this is normal.  Progress is printed below.
 datas_all = []
 binaries_all = []
 hiddenimports_all = []
 
-for pkg in ("watchdog", "sklearn", "scipy", "PIL", "cv2", "pystray",
-            "plyer", "transformers", "tokenizers", "huggingface_hub",
-            "safetensors", "regex", "tqdm", "numpy", "ImageHash",
-            "PyWavelets"):
+_COLLECT_PKGS = (
+    "watchdog", "sklearn", "scipy", "PIL", "cv2", "pystray",
+    "plyer", "transformers", "tokenizers", "huggingface_hub",
+    "safetensors", "regex", "tqdm", "numpy", "ImageHash",
+    "PyWavelets",
+)
+
+print(f"\n[spec] Collecting data/hooks for {len(_COLLECT_PKGS)} packages "
+      f"(this can take 5-20 min on first run) …", flush=True)
+
+for _pkg in _COLLECT_PKGS:
+    print(f"[spec]   • {_pkg} …", end=" ", flush=True)
     try:
-        d, b, h = collect_all(pkg)
+        d, b, h = collect_all(_pkg)
         datas_all += d
         binaries_all += b
         hiddenimports_all += h
-    except Exception:
-        pass
+        print(f"ok ({len(d)} data, {len(b)} bin, {len(h)} hidden)", flush=True)
+    except Exception as _exc:
+        print(f"skipped ({_exc})", flush=True)
+
+print("[spec] Package collection complete.\n", flush=True)
 
 # Additional hidden imports for dynamic loading patterns used in the app
 hiddenimports_extra = [

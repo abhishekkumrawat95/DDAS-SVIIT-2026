@@ -35,7 +35,7 @@ VERSION = "1.0.0"
 
 def _run(cmd: list[str], cwd: Path | None = None) -> None:
     """Run a subprocess command, raising on failure."""
-    print(f"\n>>> {' '.join(str(c) for c in cmd)}\n")
+    print(f"\n>>> {' '.join(str(c) for c in cmd)}\n", flush=True)
     result = subprocess.run(cmd, cwd=cwd or REPO_DIR)
     if result.returncode != 0:
         sys.exit(f"[ERROR] Command failed with exit code {result.returncode}")
@@ -55,7 +55,10 @@ def build_executables() -> None:
     """Run PyInstaller to produce the dist/DDAS folder."""
     print("\n" + "=" * 60)
     print("  Building executables with PyInstaller …")
-    print("=" * 60)
+    print("  NOTE: First-run collection of large packages (transformers,")
+    print("        sklearn, scipy …) can take 10–30 minutes.  The terminal")
+    print("        will show per-package progress — it is NOT frozen.")
+    print("=" * 60, flush=True)
     _run([
         sys.executable, "-m", "PyInstaller",
         "--clean",
