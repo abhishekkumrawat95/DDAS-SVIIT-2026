@@ -31,7 +31,7 @@ if errorlevel 1 goto :error_pip
 echo [OK]    Dependencies installed.
 
 echo [INFO]  Starting build...
-python build_installer.py
+python build_installer.py %*
 if errorlevel 1 goto :error_build
 
 echo.
