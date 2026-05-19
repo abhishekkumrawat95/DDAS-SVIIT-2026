@@ -2,7 +2,7 @@
 
 
 
-\*\*SVIIT Minor Project 2026\*\* | Week 6 Deliverables
+\*\*SVIIT Minor Project 2026\*\* |
 
 
 
