@@ -56,11 +56,9 @@ DDAS/
 
 \- \*\*Abhishek Kumrawat\*\* (Leader, Project Management)
 
-\- \*\*Member 2\*\* (Database, Backend)
+\- \*\*Gayatri Patil\*\* (Dashboard UI)
 
-\- \*\*Member 3\*\* (Notifications, Chatbot)
-
-\- \*\*Member 4\*\* (Dashboard UI)
+\- \*\*Saksham Pathak\*\* (Database, Backend)
 
 
 
